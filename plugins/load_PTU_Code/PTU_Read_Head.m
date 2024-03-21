@@ -23,7 +23,7 @@ else
     head.Magic =  deblank(char(fread(fid, 8, 'char')'));
     if not(strcmp(head.Magic,'PQTTTR'))
         error('Magic invalid, this is not an PTU file.');
-    end;
+    end
     head.Version = deblank(char(fread(fid, 8, 'char')'));
     
     
@@ -91,14 +91,15 @@ else
                 fprintf(1, '%s', TagString);
                 if TagIdx > -1
                     EvalName = [TagIdent '(' int2str(TagIdx + 1) ',:)'];
-                end;
-                eval([EvalName '=TagString;']);
+                end
+                %ignore all WildeString due to Luminosa Header
+                %eval([EvalName '=TagString;']);
             case tyBinaryBlob
                 TagInt = floor(fread(fid, 1, 'int64')/8);
                 TagBytes = fread(fid, 1, 'uint64');
             otherwise
                 
-        end;
+        end
         TagIdent = deblank(char(fread(fid, 32, 'char')'));  % TagHead.Ident
         TagIdx   = fread(fid, 1, 'int32');                  % TagHead.Idx
         TagTyp   = fread(fid, 1, 'uint32');                 % TagHead.Typ
