@@ -1,11 +1,10 @@
 function [head] = PTU_Read_Head(name)
-% Read PicoQuant Unified TTTR Files
-
+    % Read PicoQuant Unified TTTR Files
+    
     head = [];
     fid = fopen(name);
     if fid<1
         fprintf(1,'\n\n      Could not open <%s>. Aborted.\n', name);
-        return;
     else
         
         tyEmpty8      = hex2dec('FFFF0008');
@@ -31,18 +30,14 @@ function [head] = PTU_Read_Head(name)
         TagIdx   = fread(fid, 1, 'int32');                  % TagHead.Idx
         TagTyp   = fread(fid, 1, 'uint32');                 % TagHead.Typ
         
+        if TagIdent(1)==36
+            TagIdent = ['Remote_' TagIdent(2:end)];
+        end
+        
         while ~strcmp(TagIdent, 'Header_End')
-            
-            if strcmp(TagIdent(1),'$')
-                TagIdent(1) = '';
-            end
-            
+                    
             if TagIdx > -1
-                if strcmpi(TagIdent,'UsrHeadName')
-                    EvalName = ['head.' TagIdent '{' int2str(TagIdx + 1) '}'];
-                else
                 EvalName = ['head.' TagIdent '(' int2str(TagIdx + 1) ')'];
-                end
             else
                 EvalName = ['head.' TagIdent];
             end
@@ -75,12 +70,17 @@ function [head] = PTU_Read_Head(name)
                 case tyFloat8Array
                     TagInt = floor(fread(fid, 1, 'int64')/8);
                     TagArray = fread(fid, TagInt, 'double');
+                    eval([EvalName '=TagArray;']);
                 case tyTDateTime
                     TagFloat = fread(fid, 1, 'double');
                     eval([EvalName '=datestr(693960+TagFloat);']); 
                 case tyAnsiString
                     TagInt = fread(fid, 1, 'int64');
                     TagString = deblank(char(fread(fid, TagInt, 'char'))');
+                    tmp = char(regexp(EvalName,'\([0-9]+\)','match'));
+                    if ~isempty(tmp)
+                        EvalName=strrep(EvalName,tmp,['{' tmp(2:end-1) '}']);
+                    end
                     eval([EvalName '=TagString;']);
                 case tyWideString
                     % Matlab does not support Widestrings at all, just read and
@@ -88,15 +88,15 @@ function [head] = PTU_Read_Head(name)
                     TagInt = fread(fid, 1, 'int64');
                     TagString = fread(fid, TagInt, '*char');
                     TagString = (TagString(TagString ~= 0))';
-                    fprintf(1, '%s', TagString);
+                    fprintf(1, '%s\n', TagString);
                     if TagIdx > -1
                         EvalName = [TagIdent '(' int2str(TagIdx + 1) ',:)'];
                     end
-                    %ignore all WildeString due to Luminosa Header
+                    %ignore due to luminosa header. usually not important
                     %eval([EvalName '=TagString;']);
                 case tyBinaryBlob
-                    TagInt = floor(fread(fid, 1, 'int64')/8);
-                    TagBytes = fread(fid, 1, 'uint64');
+                    TagInt = fread(fid, 1, 'int64');
+                    TagBytes = fread(fid, TagInt, 'uint8');
                 otherwise
                     
             end
@@ -106,7 +106,7 @@ function [head] = PTU_Read_Head(name)
         end
         
         head.length = ftell(fid)+8;
-        fclose(fid); 
+        fclose(fid);
     end
     %% Argument parser for consistant TNT naming convention
     
