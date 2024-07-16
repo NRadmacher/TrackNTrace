@@ -33,10 +33,9 @@ if strcmp(name(end-2:end),'ptu')
         [~, ~, tmpchan, tmpmarkers] = PTU_Read(name, [1 1e4], head);
         dind = unique(tmpchan(~tmpmarkers));
         
-        anzch      = 32;
-        Resolution = max(1e9*head.MeasDesc_Resolution);
-        chDiv      = 1e-9*Resolution/head.MeasDesc_Resolution;
-        Ngate      = ceil(1e9*head.MeasDesc_GlobalResolution./Resolution); % Last bin was always empty
+        anzch      = head.TNTnChan;
+        chDiv      = 1; %TODO fix magic number
+        Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         
         class_t = intminclass(Ngate);         % class for the tcspc channel
         class_c = intminclass(dind);          % class for the channel

@@ -1,4 +1,4 @@
-function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate, BidirectShift, channelmap)
+function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate, BidirectShift, channelmap, shiftVector)
 % function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate,BidirectShift)
 % PTU_accumulate Generates the requsted outputs by accumulating the photons from
 % the inputfile using an intermediate index (see PTU_index).
@@ -38,12 +38,14 @@ function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbin
 %              - Alternatively, channels can be merged by providing a vector of
 %                indeces. E.g. [1 0 2 2] excludes the second channel and merges
 %                the third and fourth channel.
+% shiftVector  - A matrix containing vectors for ISM Pixelressigment
+%              - If empty data is trated as confocal
 %
 % (C) Christoph Thiele, 2020.
 
 %%
 % inputfile = 'W:\Christoph\190426_Silicarhodamine_beads\data.sptw\Vero-cells_Alexa647_11.ptu';
-narginchk(2,7);
+narginchk(2,8);
 if nargin < 3 || isempty(framebinning)
     framebinning = 1;
 end
@@ -54,7 +56,10 @@ if nargin<5 || isempty(timegate) || (islogical(timegate)&&~timegate)
     timegate = [];
 end
 if nargin<6 || isempty(BidirectShift)
-    BidirectShift = true;
+    BidirectShift = false;
+end
+if nargin<7 || isempty(shiftVector)
+    shiftVector = [];
 end
 
 % Determin the output indices and set the flags what to accumulate
@@ -197,24 +202,29 @@ else
     ny = ceil(head.ImgHdr_PixY/pixelbinning);
 end
 
-Resolution = max(1e9*head.MeasDesc_Resolution);
-% chDiv      = 1e-9*Resolution/head.MeasDesc_Resolution;
-% SyncRate   = 1./head.MeasDesc_GlobalResolution;
-Ngate   = ceil(1e9*head.MeasDesc_GlobalResolution./Resolution);
+%New parameter name with Synophotime 2.7 and multiharp 160
+Resolution = 1e9*head.MeasDesc_Resolution;
+Ngate      = ceil(1e9/(head.TTResult_SyncRate.*Resolution)); % Last bin was always empty
 
 %
 dind = double(unique(mf.im_chan(1:min(1e6,mysize(mf,'im_chan',1)),1)));
 if nargin < 7 || isempty(channelmap)
-    if isfield(head,'MeasDesc_Nchan')
-        maxch_n = head.MeasDesc_Nchan;
+    if isfield(head,'TTResult_InputRate')
+        %channels with actual imput
+        maxch_n = nnz(head.TTResult_InputRate);
         if maxch_n ~= numel(dind)
-            warning('Channel number in header does not match with channel indecs.');
+            if maxch_n == 0
+                maxch_n = numel(head.TTResult_InputRate);
+            else
+                warning('Channel number with input in header does not match with channel indecs.');
+                maxch_n = numel(dind);
+            end
         end
     else
+        %fix
         maxch_n = numel(dind);
         head.MeasDesc_Nchan = maxch_n;
     end
-    channelmap = zeros(max(dind),1);
     channelmap(dind) = 1:numel(dind);
 else % determine number of output channels from channelmap argument
     if islogical(channelmap)
@@ -227,6 +237,13 @@ else % determine number of output channels from channelmap argument
     end
     % extend to number of channels with zeros
     channelmap(end+1:max(dind)) = 0;
+    %set number of mapped channels in head
+    head.MeasDesc_UniqueChan = maxch_n;
+end
+
+%update head in output
+if ~isempty(outi_head)
+    varargout{outi_head} = head;
 end
 
 if nargin>4 && ~isempty(timegate)
@@ -303,9 +320,9 @@ px_lookup = cast(ceil((1:head.ImgHdr_PixX)/pixelbinning),sub_class)';
 py_lookup = cast(ceil((1:head.ImgHdr_PixY)/pixelbinning),sub_class)';
 
 if maskFlag
-    pyx_lookup = @(y,x)[ones(size(y)) mask(sub2ind(size(mask),y,x))];
+    pyx_lookup = @(y,x)[ones(size(y)) mask(sub2ind(size(mask),ceil(y),ceil(x)))];
 else
-    pyx_lookup = @(y,x)[py_lookup(y) px_lookup(x)];
+    pyx_lookup = @(y,x)[py_lookup(ceil(y)) px_lookup(ceil(x))];
 end
 
 c_lookup = cast(channelmap(:),sub_class);
@@ -318,8 +335,8 @@ im_frame_index = im_frame_index([firstframe:framebinning:lastframe, lastframe+1]
 % Set the number to process each iteration. If the total number of photons
 % is below 1e8 (equal max_photons for 4 GB) all photons are processed at
 % once. This avoids the call to getFreeMem() which takes approx 0.1 s.
-if im_frame_index(end)-im_frame_index(1)>1e8 
-    max_photons = getFreeMem()/(4*intbyte(sub_class)+32);       % Size of subs + tcspcdata + 3 extra double for intermediate vars.
+if im_frame_index(end)-im_frame_index(1)>1e7 
+    max_photons = getFreeMem()/(12*intbyte(sub_class)+32);       % Size of subs + sv + tcspcdata + 3 extra double for intermediate vars.
     % max_photons = 1e6;
 else
     max_photons = inf;
@@ -339,11 +356,35 @@ while cframe<=lastframe_binned
         cframe = clastframe;
         continue;
     end
-    
+    %read lin and col
+    im_line = mf.im_line(ind,1);
+    im_col  = mf.im_col(ind,1);
+    im_chan = mf.im_chan(ind,1);
+
+     % ISM shiftvectors form mat file
+    if ~isempty(shiftVector)
+
+        shift_x = shiftVector.sv(1, im_chan).';
+        shift_y = shiftVector.sv(2, im_chan).';
+
+        %apply ISM reassigment vektor
+        %take care of pixel size difference
+        im_col  = im_col + shift_x./( head.ImgHdr_PixResol/shiftVector.svPixelSize);
+        im_line = im_line + shift_y./( head.ImgHdr_PixResol/shiftVector.svPixelSize);
+        
+        clear shift_y shift_x;
+    end
+
+    % take casre of photons beeing shifted out of the image
+    im_col  = max(im_col, 1);
+    im_col  = min(im_col, ceil(head.ImgHdr_PixX/pixelbinning));
+    im_line = max(im_line, 1);
+    im_line = min(im_line, ceil(head.ImgHdr_PixY/pixelbinning));
+
     subs = [
-            pyx_lookup(mf.im_line(ind,1),...
-                       mf.im_col(ind,1))...
-            c_lookup(mf.im_chan(ind,1)),...
+            pyx_lookup(im_line,...
+                       im_col)...
+            c_lookup(im_chan),...
             frame_fun(mf.im_frame(ind,1))];
         
     if accum_arrival
