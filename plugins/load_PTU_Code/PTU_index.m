@@ -16,7 +16,7 @@ if strcmp(name(end-2:end),'ptu')
     
     head = PTU_Read_Head(name);
     if ~isempty(head)
-        nphot = head.TTResult_NumberOfRecords;
+        nphot = head.TNTnPhoton;
         freeMem = getFreeMem();
          % We need at least 2 doubles (8 bytes) per photon
         if freeMem< nphot*(8*3)
@@ -29,24 +29,27 @@ if strcmp(name(end-2:end),'ptu')
         if bufferFlag && exist(mfile,'file')
             delete(mfile);
         end
-        
-        [~, ~, tmpchan, tmpmarkers] = PTU_Read(name, [1 1e4], head);
+
+        [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
+%         [~, ~, tmpchan, tmpmarkers] = PTU_Read(name, [1 1e4], head);
         dind = unique(tmpchan(~tmpmarkers));
         
-        anzch      = head.TNTnChan;
+        anzch      = head.TNTnChan; %danger! for conf images Markers are in chan 2,3,4 maybe new head.TNTmChan
         chDiv      = 1; %TODO fix magic number
         Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         
         class_t = intminclass(Ngate);         % class for the tcspc channel
         class_c = intminclass(dind);          % class for the channel
         
-        if head.ImgHdr_Dimensions == 1 % Point measurement
+        if head.TNTmeasDim == 1 % Point measurement
             h1 = waitbar(0,'Reading photons');
             
             cnt      = 0; % Read photons (including markers)
             cn_ind  = 0; % Read photons (excluding markers)
             tend     = 0;
-            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+
+            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
+%             [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
             
             while (num>0)
                 
@@ -74,8 +77,9 @@ if strcmp(name(end-2:end),'ptu')
                     im_chan = cast([],'like',im_chan);
                     cn_ind = 0;
                 end
-                
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 
             end
             
@@ -85,13 +89,13 @@ if strcmp(name(end-2:end),'ptu')
             im_line = [];
             im_frame = [];
             im_frame_index = [];            
-        elseif head.ImgHdr_Ident == 6 ...% SingleFrame Scan (Piezo) 
-            || head.ImgHdr_Ident == 9    % MultiFrame Scan (FLIMbee)
+        elseif head.TNTident == 6 ...% SingleFrame Scan (Piezo) 
+            || head.TNTident == 9    % MultiFrame Scan (FLIMbee)
             
-            nx    = head.ImgHdr_PixX;
-            ny    = head.ImgHdr_PixY;
+            nx    = head.TNTpixX;
+            ny    = head.TNTpixY;
             
-            if head.ImgHdr_Ident == 6 % Piezo measurment single frame
+            if head.TNTident == 6 % Piezo measurment single frame
                 nz = 1;
                 BidirectShift = false; % disable shift correction
             elseif isfield(head,'ImgHdr_MaxFrames')
@@ -101,8 +105,8 @@ if strcmp(name(end-2:end),'ptu')
                 tot_time = head.TTResult_StopAfter*1e-3;
                 nz = ceil(tot_time/tim_p_frame);
             end
-            class_x = intminclass(nx);  % class for the x position
-            class_y = intminclass(ny);  % class for the y position
+            class_x = 'double';  % class for the x position
+            class_y = 'double';  % class for the y position
             class_f = intminclass(nz);  % class for the frame number
             
             LineStart = 4;
@@ -160,9 +164,10 @@ if strcmp(name(end-2:end),'ptu')
             
             h1 = waitbar(0,['Generating index: Frame ' num2str(nframe) ' out of ' num2str(nz)]);
                         
-            if head.ImgHdr_BiDirect == 0
-                    
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+            if ~head.TNTisBiDirectional
+                
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 
                 while (num>0)
                     
@@ -260,7 +265,7 @@ if strcmp(name(end-2:end),'ptu')
                         Turns2  = [];
                     end
                     
-                    waitbar(cnt/head.TTResult_NumberOfRecords,h1,sprintf(['Generating index: Frame %d out of %d'],nframe,nz));
+                    waitbar(cnt/ head.TNTnPhoton,h1,sprintf('Generating index: Frame %d out of %d',nframe,nz));
                     drawnow
                     
                     if bufferFlag
@@ -279,7 +284,8 @@ if strcmp(name(end-2:end),'ptu')
                         cn_ind = 0;
                     end
                     
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+%                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                     
                 end
                          
@@ -291,7 +297,8 @@ if strcmp(name(end-2:end),'ptu')
                     [BidirectShift, head] = PTU_getBidirectShift(name);
                 end
                 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 %                 Framechange = [];
                 while (num>0)
                     
@@ -419,7 +426,7 @@ if strcmp(name(end-2:end),'ptu')
                         Turns2  = Turns2(jmax+1:end);
                     end
                     
-                    waitbar(cnt/head.TTResult_NumberOfRecords,h1,sprintf(['Generating index: Frame ' num2str(nframe,'%d') ' out of ' num2str(nz)]));
+                    waitbar(cnt/head.TNTnPhoton,h1,sprintf(['Generating index: Frame ' num2str(nframe,'%d') ' out of ' num2str(nz)]));
                     drawnow
                     
                     if bufferFlag
@@ -437,7 +444,8 @@ if strcmp(name(end-2:end),'ptu')
                         im_col = cast([],'like',im_col);
                         cn_ind = 0;
                     end
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+%                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 end
             end
             

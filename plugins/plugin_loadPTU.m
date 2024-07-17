@@ -134,7 +134,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                     error('Unknown fastLT parameter');
             end
             movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
-           
+            pluginOptions.uniqChan = head.TNTuniqChan; 
             if pluginOptions.fourierReweighting
                 PSF = calib.psf;
                 fprintf('Fourier reweighting ... ');

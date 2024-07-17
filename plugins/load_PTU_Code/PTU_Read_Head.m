@@ -117,6 +117,7 @@ function [head] = PTU_Read_Head(name)
     frameRateFields     = {''};
     tcspsResFields      = {'MeasDesc_Resolution'};
     dimensionFields     = {'ImgHdr_Dimensions'};
+    identFields         = {'ImgHdr_Ident'};
     pixXFields          = {'ImgHdr_PixX'};
     pixYFields          = {'ImgHdr_PixY'};
     syncRateFields      = {'TTResult_SyncRate'};
@@ -156,6 +157,13 @@ function [head] = PTU_Read_Head(name)
     for i = 1:numel(dimensionFields)
         if isfield(head,dimensionFields{i})
             head.TNTmeasDim = head.(dimensionFields{i});
+        end
+    end
+
+    %aquision identifier[#] 
+    for i = 1:numel(identFields)
+        if isfield(head,identFields{i})
+            head.TNTident = head.(identFields{i});
         end
     end
 
