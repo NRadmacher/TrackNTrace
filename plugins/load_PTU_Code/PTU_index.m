@@ -56,7 +56,7 @@ if strcmp(name(end-2:end),'ptu')
                 tmpy = tmpy+tend;
                 tend  = tmpy(end)+loc;
                 
-                ind = (tmpmarkers==0)&((tmpchan<anzch)&(tmptcspc<Ngate*chDiv)); %Remove all marker and invalid photons
+                ind = (tmpmarkers==0)&((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv)); %Remove all marker and invalid photons
                 cn_num = sum(ind);
                             
                 im_sync(cn_ind+1:cn_ind+cn_num,1)   = tmpy(ind);
@@ -176,7 +176,7 @@ if strcmp(name(end-2:end),'ptu')
                     end
                     tend  = tmpy(end)+loc;
                     
-                    ind = (tmpmarkers>0)|((tmpchan<anzch)&(tmptcspc<Ngate*chDiv));
+                    ind = (tmpmarkers>0)|((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv));
                     
                     y       = [y; tmpy(ind)];                         %#ok<AGROW>
                     tmpx    = uint16([tmpx; floor(tmptcspc(ind)./chDiv)+1]);
@@ -305,7 +305,7 @@ if strcmp(name(end-2:end),'ptu')
                     end
                     tend  = tmpy(end)+loc;
                     
-                    ind = ((tmpchan<anzch)&(tmptcspc<Ngate*chDiv));
+                    ind = ((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv));
                     
                     y       = [y; tmpy(ind)];                         %#ok<AGROW>
                     tmpx    = uint16([tmpx; floor(tmptcspc(ind)./chDiv)+1]);
