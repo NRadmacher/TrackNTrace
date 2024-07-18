@@ -207,26 +207,26 @@ end
 Resolution = 1e9*head.TNTtcspsBinSize; %in ns?
 Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
 
-%
-%dind = double(unique(mf.im_chan(1:min(1e6,mysize(mf,'im_chan',1)),1)));
 if nargin < 7 || isempty(channelmap)
     %get number of channels form header and sum all up
-    maxch_n = 1;
-    channelmap = ones(head.TNTnChan,1);
+    maxch_n     = 1;
+    channelmap  = head.TNTchanMap;
 else % determine number of output channels from channelmap argument
     if islogical(channelmap)
         % one channel for each true channelmap 
-        maxch_n = sum(channelmap);
-        channelmap = find(channelmap);
+        maxch_n     = sum(channelmap);
+        channelmap  = find(channelmap);
     else
         % number of channels is maxium index in channelmap
-        maxch_n = max(channelmap);
+        maxch_n     = max(channelmap);
     end
     % extend to number of channels with zeros
     %channelmap(end+1:max(dind)) = 0;
 end
+
 %Add field to head to save the choise of channelmap
 head.TNTuniqChan = maxch_n;
+
 %update head in output
 if ~isempty(outi_head)
     varargout{outi_head} = head;

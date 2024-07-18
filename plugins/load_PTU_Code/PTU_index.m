@@ -33,7 +33,8 @@ if strcmp(name(end-2:end),'ptu')
         [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
         dind = unique(tmpchan(~tmpmarkers));
         
-        anzch      = head.TNTnChan; %danger! for conf images Markers are in chan 2,3,4 maybe new head.TNTmChan
+        %channels that contain photons
+        anzch      = head.TNTnChan;%DANGER! need to fix case were a singe detector is used with large(>4 channels) event timer 
         chDiv      = 1; %TODO fix magic number
         Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         
