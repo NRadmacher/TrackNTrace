@@ -11,7 +11,7 @@ function [head, im_sync, im_tcspc, im_chan, im_line, im_col, im_frame] = PTU_ind
 %
 % Copyright (C) 2020, Jan Christoph Thiele, christoph.thiele@phys.uni-goettingen.de
 
-photons = 5e6;
+photons = 1e7;
 if strcmp(name(end-2:end),'ptu')
     
     head = PTU_Read_Head(name);
@@ -31,7 +31,6 @@ if strcmp(name(end-2:end),'ptu')
         end
 
         [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
-%         [~, ~, tmpchan, tmpmarkers] = PTU_Read(name, [1 1e4], head);
         dind = unique(tmpchan(~tmpmarkers));
         
         anzch      = head.TNTnChan; %danger! for conf images Markers are in chan 2,3,4 maybe new head.TNTmChan
@@ -49,7 +48,6 @@ if strcmp(name(end-2:end),'ptu')
             tend     = 0;
 
             [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
-%             [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
             
             while (num>0)
                 
@@ -78,9 +76,7 @@ if strcmp(name(end-2:end),'ptu')
                     cn_ind = 0;
                 end
 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
-%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
-                
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);           
             end
             
             close(h1);
@@ -122,6 +118,10 @@ if strcmp(name(end-2:end),'ptu')
             if isfield(head,'ImgHdr_Frame')
                 Frame = 2^(head.ImgHdr_Frame-1);
             end
+            %for PTUs the type of marker is safed in the channel. Thus one
+            %need a minimum amount of channels regardless of the number of
+            %detectors
+            anzch = max([head.TNTnChan,LineStart,LineStop,Frame]);
             y        = [];
             tmpx     = [];
             chan     = [];
@@ -166,9 +166,7 @@ if strcmp(name(end-2:end),'ptu')
                         
             if ~head.TNTisBiDirectional
                 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
-%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
-                
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);   
                 while (num>0)
                     
                     cnt = cnt + num;
@@ -285,7 +283,6 @@ if strcmp(name(end-2:end),'ptu')
                     end
                     
                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
-%                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                     
                 end
                          
@@ -298,7 +295,6 @@ if strcmp(name(end-2:end),'ptu')
                 end
                 
                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
-%                 [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 %                 Framechange = [];
                 while (num>0)
                     
@@ -445,7 +441,6 @@ if strcmp(name(end-2:end),'ptu')
                         cn_ind = 0;
                     end
                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
-%                     [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 end
             end
             
