@@ -11,12 +11,12 @@ function [head, im_sync, im_tcspc, im_chan, im_line, im_col, im_frame] = PTU_ind
 %
 % Copyright (C) 2020, Jan Christoph Thiele, christoph.thiele@phys.uni-goettingen.de
 
-photons = 5e6;
+photons = 1e7;
 if strcmp(name(end-2:end),'ptu')
     
     head = PTU_Read_Head(name);
     if ~isempty(head)
-        nphot = head.TTResult_NumberOfRecords;
+        nphot = head.TNTnPhoton;
         freeMem = getFreeMem();
          % We need at least 2 doubles (8 bytes) per photon
         if freeMem< nphot*(8*3)
@@ -29,25 +29,26 @@ if strcmp(name(end-2:end),'ptu')
         if bufferFlag && exist(mfile,'file')
             delete(mfile);
         end
-        
-        [~, ~, tmpchan, tmpmarkers] = PTU_Read(name, [1 1e4], head);
+
+        [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
         dind = unique(tmpchan(~tmpmarkers));
         
-        anzch      = 32;
-        Resolution = max(1e9*head.MeasDesc_Resolution);
-        chDiv      = 1e-9*Resolution/head.MeasDesc_Resolution;
-        Ngate      = ceil(1e9*head.MeasDesc_GlobalResolution./Resolution); % Last bin was always empty
+        %channels that contain photons
+        anzch      = head.TNTnChan;%DANGER! need to fix case were a singe detector is used with large(>4 channels) event timer 
+        chDiv      = 1; %TODO fix magic number
+        Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         
         class_t = intminclass(Ngate);         % class for the tcspc channel
         class_c = intminclass(dind);          % class for the channel
         
-        if head.ImgHdr_Dimensions == 1 % Point measurement
+        if head.TNTmeasDim == 1 % Point measurement
             h1 = waitbar(0,'Reading photons');
             
             cnt      = 0; % Read photons (including markers)
             cn_ind  = 0; % Read photons (excluding markers)
             tend     = 0;
-            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+
+            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
             
             while (num>0)
                 
@@ -55,7 +56,7 @@ if strcmp(name(end-2:end),'ptu')
                 tmpy = tmpy+tend;
                 tend  = tmpy(end)+loc;
                 
-                ind = (tmpmarkers==0)&((tmpchan<anzch)&(tmptcspc<Ngate*chDiv)); %Remove all marker and invalid photons
+                ind = (tmpmarkers==0)&((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv)); %Remove all marker and invalid photons
                 cn_num = sum(ind);
                             
                 im_sync(cn_ind+1:cn_ind+cn_num,1)   = tmpy(ind);
@@ -75,9 +76,8 @@ if strcmp(name(end-2:end),'ptu')
                     im_chan = cast([],'like',im_chan);
                     cn_ind = 0;
                 end
-                
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
-                
+
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);           
             end
             
             close(h1);
@@ -86,13 +86,13 @@ if strcmp(name(end-2:end),'ptu')
             im_line = [];
             im_frame = [];
             im_frame_index = [];            
-        elseif head.ImgHdr_Ident == 6 ...% SingleFrame Scan (Piezo) 
-            || head.ImgHdr_Ident == 9    % MultiFrame Scan (FLIMbee)
+        elseif head.TNTident == 6 ...% SingleFrame Scan (Piezo) 
+            || head.TNTident == 9    % MultiFrame Scan (FLIMbee)
             
-            nx    = head.ImgHdr_PixX;
-            ny    = head.ImgHdr_PixY;
+            nx    = head.TNTpixX;
+            ny    = head.TNTpixY;
             
-            if head.ImgHdr_Ident == 6 % Piezo measurment single frame
+            if head.TNTident == 6 % Piezo measurment single frame
                 nz = 1;
                 BidirectShift = false; % disable shift correction
             elseif isfield(head,'ImgHdr_MaxFrames')
@@ -102,8 +102,8 @@ if strcmp(name(end-2:end),'ptu')
                 tot_time = head.TTResult_StopAfter*1e-3;
                 nz = ceil(tot_time/tim_p_frame);
             end
-            class_x = intminclass(nx);  % class for the x position
-            class_y = intminclass(ny);  % class for the y position
+            class_x = 'double';  % class for the x position
+            class_y = 'double';  % class for the y position
             class_f = intminclass(nz);  % class for the frame number
             
             LineStart = 4;
@@ -119,6 +119,10 @@ if strcmp(name(end-2:end),'ptu')
             if isfield(head,'ImgHdr_Frame')
                 Frame = 2^(head.ImgHdr_Frame-1);
             end
+            %for PTUs the type of marker is safed in the channel. Thus one
+            %need a minimum amount of channels regardless of the number of
+            %detectors
+            anzch = max([head.TNTnChan,LineStart,LineStop,Frame]);
             y        = [];
             tmpx     = [];
             chan     = [];
@@ -161,10 +165,9 @@ if strcmp(name(end-2:end),'ptu')
             
             h1 = waitbar(0,['Generating index: Frame ' num2str(nframe) ' out of ' num2str(nz)]);
                         
-            if head.ImgHdr_BiDirect == 0
-                    
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+            if ~head.TNTisBiDirectional
                 
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);   
                 while (num>0)
                     
                     cnt = cnt + num;
@@ -173,7 +176,7 @@ if strcmp(name(end-2:end),'ptu')
                     end
                     tend  = tmpy(end)+loc;
                     
-                    ind = (tmpmarkers>0)|((tmpchan<anzch)&(tmptcspc<Ngate*chDiv));
+                    ind = (tmpmarkers>0)|((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv));
                     
                     y       = [y; tmpy(ind)];                         %#ok<AGROW>
                     tmpx    = uint16([tmpx; floor(tmptcspc(ind)./chDiv)+1]);
@@ -261,7 +264,7 @@ if strcmp(name(end-2:end),'ptu')
                         Turns2  = [];
                     end
                     
-                    waitbar(cnt/head.TTResult_NumberOfRecords,h1,sprintf(['Generating index: Frame %d out of %d'],nframe,nz));
+                    waitbar(cnt/ head.TNTnPhoton,h1,sprintf('Generating index: Frame %d out of %d',nframe,nz));
                     drawnow
                     
                     if bufferFlag
@@ -280,7 +283,7 @@ if strcmp(name(end-2:end),'ptu')
                         cn_ind = 0;
                     end
                     
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
                     
                 end
                          
@@ -292,7 +295,7 @@ if strcmp(name(end-2:end),'ptu')
                     [BidirectShift, head] = PTU_getBidirectShift(name);
                 end
                 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
                 %                 Framechange = [];
                 while (num>0)
                     
@@ -302,7 +305,7 @@ if strcmp(name(end-2:end),'ptu')
                     end
                     tend  = tmpy(end)+loc;
                     
-                    ind = ((tmpchan<anzch)&(tmptcspc<Ngate*chDiv));
+                    ind = ((tmpchan<=anzch)&(tmptcspc<Ngate*chDiv));
                     
                     y       = [y; tmpy(ind)];                         %#ok<AGROW>
                     tmpx    = uint16([tmpx; floor(tmptcspc(ind)./chDiv)+1]);
@@ -420,7 +423,7 @@ if strcmp(name(end-2:end),'ptu')
                         Turns2  = Turns2(jmax+1:end);
                     end
                     
-                    waitbar(cnt/head.TTResult_NumberOfRecords,h1,sprintf(['Generating index: Frame ' num2str(nframe,'%d') ' out of ' num2str(nz)]));
+                    waitbar(cnt/head.TNTnPhoton,h1,sprintf(['Generating index: Frame ' num2str(nframe,'%d') ' out of ' num2str(nz)]));
                     drawnow
                     
                     if bufferFlag
@@ -438,7 +441,7 @@ if strcmp(name(end-2:end),'ptu')
                         im_col = cast([],'like',im_col);
                         cn_ind = 0;
                     end
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
                 end
             end
             

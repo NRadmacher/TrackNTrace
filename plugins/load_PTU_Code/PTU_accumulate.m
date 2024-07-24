@@ -1,4 +1,4 @@
-function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate, BidirectShift, channelmap)
+function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate, BidirectShift, channelmap, shiftVector)
 % function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate,BidirectShift)
 % PTU_accumulate Generates the requsted outputs by accumulating the photons from
 % the inputfile using an intermediate index (see PTU_index).
@@ -38,12 +38,14 @@ function [varargout] = PTU_accumulate(inputfile, outputs, framebinning, pixelbin
 %              - Alternatively, channels can be merged by providing a vector of
 %                indeces. E.g. [1 0 2 2] excludes the second channel and merges
 %                the third and fourth channel.
+% shiftVector  - A matrix containing vectors for ISM Pixelressigment
+%              - If empty data is trated as confocal
 %
 % (C) Christoph Thiele, 2020.
 
 %%
 % inputfile = 'W:\Christoph\190426_Silicarhodamine_beads\data.sptw\Vero-cells_Alexa647_11.ptu';
-narginchk(2,7);
+narginchk(2,8);
 if nargin < 3 || isempty(framebinning)
     framebinning = 1;
 end
@@ -54,7 +56,10 @@ if nargin<5 || isempty(timegate) || (islogical(timegate)&&~timegate)
     timegate = [];
 end
 if nargin<6 || isempty(BidirectShift)
-    BidirectShift = true;
+    BidirectShift = false;
+end
+if nargin<7 || isempty(shiftVector)
+    shiftVector = [];
 end
 
 % Determin the output indices and set the flags what to accumulate
@@ -118,7 +123,8 @@ else
     
     mf = matfile(mfile);
     head = mf.head;
-    if head.ImgHdr_Dimensions == 1 % Error for point measurements.
+    if head.TNTmeasDim == 1
+        % Error for point measurements.
         warning('Measurement is not a scan.');
         [varargout{1:nargout}] = deal([]);
         if ~isempty(outi_head)
@@ -127,7 +133,7 @@ else
         return
     end
     % Recalculate index if the BidirectShift is not matching
-    if endsWith(inputfile,'.ptu')&&head.ImgHdr_BiDirect&&((( isempty(BidirectShift) || (islogical(BidirectShift) && BidirectShift==false)) && isfield(head,'ImgHdr_BiDirectFittedOffset') && head.ImgHdr_BiDirectFittedOffset ~= 0)...
+    if endsWith(inputfile,'.ptu')&&head.TNTisBiDirectional&&((( isempty(BidirectShift) || (islogical(BidirectShift) && BidirectShift==false)) && isfield(head,'ImgHdr_BiDirectFittedOffset') && head.ImgHdr_BiDirectFittedOffset ~= 0)...
                                                           ||( ~isempty(BidirectShift) && ~(islogical(BidirectShift) && BidirectShift==false) && (~isfield(head,'ImgHdr_BiDirectFittedOffset') || isfloat(BidirectShift) && head.ImgHdr_BiDirectFittedOffset ~= BidirectShift)))
         PTU_index(inputfile,BidirectShift);
         mf = matfile(mfile);
@@ -177,7 +183,7 @@ if ~batchFlag, h1 = waitbar(0,sprintf('Accumulating photons: Frame %d out of %d'
 if numel(pixelbinning)>1
     maskFlag = true;
     mask = pixelbinning;
-    pixelbinning = [head.ImgHdr_PixY head.ImgHdr_PixX]./size(mask);
+    pixelbinning = [head.TNTpixY head.TNTpixX]./size(mask);
     if prod(pixelbinning)~=1
         warning('Masks do not work yet with pixelbinning. Check LinCAM_accumulate.m for a working implemenation.');
     end
@@ -193,40 +199,37 @@ else
     if isinf(pixelbinning)
         pixelbinning = 1/eps; % use a very large number instead of inf to avoid zeros in the look up.
     end
-    nx = ceil(head.ImgHdr_PixX/pixelbinning);
-    ny = ceil(head.ImgHdr_PixY/pixelbinning);
+    nx = ceil(head.TNTpixX/pixelbinning);
+    ny = ceil(head.TNTpixY/pixelbinning);
 end
 
-Resolution = max(1e9*head.MeasDesc_Resolution);
-% chDiv      = 1e-9*Resolution/head.MeasDesc_Resolution;
-% SyncRate   = 1./head.MeasDesc_GlobalResolution;
-Ngate   = ceil(1e9*head.MeasDesc_GlobalResolution./Resolution);
+%New parameter name with Synophotime 2.7 and multiharp 160
+Resolution = 1e9*head.TNTtcspsBinSize; %in ns?
+Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
 
-%
-dind = double(unique(mf.im_chan(1:min(1e6,mysize(mf,'im_chan',1)),1)));
 if nargin < 7 || isempty(channelmap)
-    if isfield(head,'MeasDesc_Nchan')
-        maxch_n = head.MeasDesc_Nchan;
-        if maxch_n ~= numel(dind)
-            warning('Channel number in header does not match with channel indecs.');
-        end
-    else
-        maxch_n = numel(dind);
-        head.MeasDesc_Nchan = maxch_n;
-    end
-    channelmap = zeros(max(dind),1);
-    channelmap(dind) = 1:numel(dind);
+    %get number of channels form header and sum all up
+    maxch_n     = 1;
+    channelmap  = head.TNTchanMap;
 else % determine number of output channels from channelmap argument
     if islogical(channelmap)
         % one channel for each true channelmap 
-        maxch_n = sum(channelmap);
-        channelmap = find(channelmap);
+        maxch_n     = sum(channelmap);
+        channelmap  = find(channelmap);
     else
         % number of channels is maxium index in channelmap
-        maxch_n = max(channelmap);
+        maxch_n     = max(channelmap);
     end
     % extend to number of channels with zeros
-    channelmap(end+1:max(dind)) = 0;
+    %channelmap(end+1:max(dind)) = 0;
+end
+
+%Add field to head to save the choise of channelmap
+head.TNTuniqChan = maxch_n;
+
+%update head in output
+if ~isempty(outi_head)
+    varargout{outi_head} = head;
 end
 
 if nargin>4 && ~isempty(timegate)
@@ -279,10 +282,10 @@ if ~isempty(outi_cell)
 end
 
 if accum_tcspc
-    tcspc_pix = zeros(ny,nx,Ngate,maxch_n,intminclass(head.TTResult_NumberOfRecords/max(1,nx*ny))); %This class should be quite safe. The estimation is that all photons are in one TCSPC channel, but evenly distributed over the pixels
+    tcspc_pix = zeros(ny,nx,Ngate,maxch_n,intminclass(head.TNTnPhoton/max(1,nx*ny))); %This class should be quite safe. The estimation is that all photons are in one TCSPC channel, but evenly distributed over the pixels
 end
 if accum_tcspc_f
-    tcspc_pix_frame = zeros(ny,nx,Ngate,maxch_n,lastframe_binned,intminclass(head.TTResult_NumberOfRecords/max(1,nx*ny)));
+    tcspc_pix_frame = zeros(ny,nx,Ngate,maxch_n,lastframe_binned,intminclass(head.TNTnPhoton/max(1,nx*ny)));
 end
 if accum_tag
     tag = zeros(ny,nx,maxch_n,lastframe_binned);
@@ -299,13 +302,13 @@ end
 
 frame_lookup = cast(binfun(1:lastframe),sub_class)';
 frame_fun = @(frames)frame_lookup(frames)-frame_lookup(frames(1,:))+1; % Relative indices of the frames. The first frame in frames allways gets the index 1.
-px_lookup = cast(ceil((1:head.ImgHdr_PixX)/pixelbinning),sub_class)';
-py_lookup = cast(ceil((1:head.ImgHdr_PixY)/pixelbinning),sub_class)';
+px_lookup = cast(ceil((1:head.TNTpixX)/pixelbinning),sub_class)';
+py_lookup = cast(ceil((1:head.TNTpixY)/pixelbinning),sub_class)';
 
 if maskFlag
-    pyx_lookup = @(y,x)[ones(size(y)) mask(sub2ind(size(mask),y,x))];
+    pyx_lookup = @(y,x)[ones(size(y)) mask(sub2ind(size(mask),ceil(y),ceil(x)))];
 else
-    pyx_lookup = @(y,x)[py_lookup(y) px_lookup(x)];
+    pyx_lookup = @(y,x)[py_lookup(ceil(y)) px_lookup(ceil(x))];
 end
 
 c_lookup = cast(channelmap(:),sub_class);
@@ -318,8 +321,8 @@ im_frame_index = im_frame_index([firstframe:framebinning:lastframe, lastframe+1]
 % Set the number to process each iteration. If the total number of photons
 % is below 1e8 (equal max_photons for 4 GB) all photons are processed at
 % once. This avoids the call to getFreeMem() which takes approx 0.1 s.
-if im_frame_index(end)-im_frame_index(1)>1e8 
-    max_photons = getFreeMem()/(4*intbyte(sub_class)+32);       % Size of subs + tcspcdata + 3 extra double for intermediate vars.
+if im_frame_index(end)-im_frame_index(1)>1e7 
+    max_photons = getFreeMem()/(12*intbyte(sub_class)+32);       % Size of subs + sv + tcspcdata + 3 extra double for intermediate vars.
     % max_photons = 1e6;
 else
     max_photons = inf;
@@ -339,11 +342,35 @@ while cframe<=lastframe_binned
         cframe = clastframe;
         continue;
     end
-    
+    %read lin and col
+    im_line = mf.im_line(ind,1);
+    im_col  = mf.im_col(ind,1);
+    im_chan = mf.im_chan(ind,1);
+
+     % ISM shiftvectors form mat file
+    if ~isempty(shiftVector)
+
+        shift_x = shiftVector.sv(1, im_chan).';
+        shift_y = shiftVector.sv(2, im_chan).';
+
+        %apply ISM reassigment vektor
+        %take care of pixel size difference
+        im_col  = im_col + shift_x./(head.TNTpixelSize/shiftVector.svPixelSize);
+        im_line = im_line + shift_y./(head.TNTpixelSize/shiftVector.svPixelSize);
+        
+        clear shift_y shift_x;
+    end
+
+    % take casre of photons beeing shifted out of the image
+    im_col  = max(im_col, 1);
+    im_col  = min(im_col, ceil(head.TNTpixX/pixelbinning));
+    im_line = max(im_line, 1);
+    im_line = min(im_line, ceil(head.TNTpixY/pixelbinning));
+
     subs = [
-            pyx_lookup(mf.im_line(ind,1),...
-                       mf.im_col(ind,1))...
-            c_lookup(mf.im_chan(ind,1)),...
+            pyx_lookup(im_line,...
+                       im_col)...
+            c_lookup(im_chan),...
             frame_fun(mf.im_frame(ind,1))];
         
     if accum_arrival
