@@ -26,11 +26,11 @@ This version is suitable for lifetime-resolved single molecule localisation micr
 It is maintained by Jan Christoph Thiele from the University of Goettingen. Its first release can be found [here](../../releases/tag/v2.0).
 
 ## TrackNTrace *ISM Edition*
-This extends the *Lifetime Edition* of TrackNTrace to analyze data recorded with an Array-Detector introducing the following features
+This extends the *Lifetime Edition* of TrackNTrace to analyze data recorded with an Array-Detector introducing the following features:
 * switching between different ISM data analysis modes
-    * *summing* up all photons from all pixels, equivalent to a CLSM with opened pinhole
-    * *pixel reassignment* to adjust the position of each detected photon, increasing the lateral resolution by a factor of 1.41
-    * *fourier-reweighting* to readjust Fourier-frequency distribution after pixel reassignment, increasing the lateral resolution by an additional factor of 1.41
+	* *summing* up all photons from all pixels, equivalent to a CLSM with opened pinhole
+	* *pixel reassignment* to adjust the position of each detected photon, increasing the lateral resolution by a factor of 1.41
+	* *fourier-reweighting* to readjust Fourier-frequency distribution after pixel reassignment, increasing the lateral resolution by an additional factor of 1.41
 * consistent naming convention for PTU imports
 
 ## Citation
