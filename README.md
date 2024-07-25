@@ -29,7 +29,7 @@ It is maintained by Jan Christoph Thiele from the University of Goettingen. Its 
 This extends the *Lifetime Edition* of TrackNTrace to analyze data recorded with an Array-Detector introducing the following features:
 * switching between different ISM data analysis modes
 	* *summing* up all photons from all pixels, equivalent to a CLSM with opened pinhole
-	* *pixel reassignment* to adjust the position of each detected photon, increasing the lateral resolution by a factor of 1.41
+	* *pixel reassignment* to adjust the position of each detected photon, increasing the lateral resolution by a factor of 1.41 
 	* *fourier-reweighting* to readjust Fourier-frequency distribution after pixel reassignment, increasing the lateral resolution by an additional factor of 1.41
 * consistent naming convention for PTU imports
 
@@ -39,6 +39,9 @@ SC Stein, and J Thiart, *Sci. Rep.* **6**, 37947; doi: [10.1038/srep37947](https
 
 If you use the new FLIM capabilities please also cite:
 JC Thiele, DA Helmerich, N Oleksiievets, R Tsukanov, E Butkevich, M Sauer, O Nevskyi, and J Enderlein, *ACS Nano*, 14, 10, 14190–14200; doi: [10.1021/acsnano.0c07322](https://pubs.acs.org/doi/10.1021/acsnano.0c07322) (2020).
+
+If you use the new ISM version pleas also cite:
+N Radmacher, O Nevskyi, JI Gallea, JC Thiele, I Gregor, SO Rizzoli and J Enderlein, *bioRxiv*, doi: [10.1101/2023.08.23.554438](https://doi.org/10.1101/2023.08.23.554438) (2024).
 
 ## Licensing
 
