@@ -33,8 +33,10 @@ if strcmp(name(end-2:end),'ptu')
         [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1 1e4], head);
         dind = unique(tmpchan(~tmpmarkers));
         
-        %channels that contain photons
-        anzch      = head.TNTnChan;%DANGER! need to fix case were a singe detector is used with large(>4 channels) event timer 
+        %channels that may contain photons.
+        %for ISM data number of pixels. for confocal data number of  
+        %device channels
+        anzch      = head.TNTnChan;
         chDiv      = 1; %TODO fix magic number
         Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         

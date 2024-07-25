@@ -191,17 +191,17 @@ function [head] = PTU_Read_Head(name)
     %number of channels or detectors [#] 
     for i = 1:numel(numberOfChFields)
         if isfield(head,numberOfChFields{i})
-            %TODO check when this filed is not used
-            if isfield(head,'TTResult_InputRate')
+            %this filed contains the data channels
+            if isfield(head,'TTResult_InputRate')%TODO are there other names for this channel
                 %only use chanels that record photons
                 if sum((head.TTResult_InputRate ~= 0)) < head.(numberOfChFields{i})
                     ind = find(head.TTResult_InputRate);
                     if ~isempty(ind)
                         %We asume that hydra harp is not used for ISM
-                        if head.(numberOfChFields{i}) < 8
+                        if head.(numberOfChFields{i}) <= 8
                             head.TNTnChan       = numel(ind);
                             head.TNTchanMap     = ones(numel(head.TTResult_InputRate),1);
-                        %i all other cases it is assumed no channels are
+                        %in all other cases it is assumed no channels are
                         %skipped
                         else
                             head.TNTnChan       = ind(end);
