@@ -30,11 +30,13 @@ if strcmp(name(end-2:end),'ptu')
             delete(mfile);
         end
 
-        [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
+        [~, ~, tmpchan, tmpmarkers, ~, ~] = PTU_Read(name, [1 1e4], head);
         dind = unique(tmpchan(~tmpmarkers));
         
-        %channels that contain photons
-        anzch      = head.TNTnChan;%DANGER! need to fix case were a singe detector is used with large(>4 channels) event timer 
+        %channels that may contain photons.
+        %for ISM data number of pixels. for confocal data number of  
+        %device channels
+        anzch      = head.TNTnChan;
         chDiv      = 1; %TODO fix magic number
         Ngate      = ceil(1/(head.TNTsyncRate*head.TNTtcspsBinSize)); % Last bin was always empty
         
@@ -48,7 +50,7 @@ if strcmp(name(end-2:end),'ptu')
             cn_ind  = 0; % Read photons (excluding markers)
             tend     = 0;
 
-            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [1e4 1], head.length, head.TTResultFormat_TTTRRecType);
+            [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [1 1e4], head);
             
             while (num>0)
                 
@@ -77,7 +79,7 @@ if strcmp(name(end-2:end),'ptu')
                     cn_ind = 0;
                 end
 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);           
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);           
             end
             
             close(h1);
@@ -167,7 +169,7 @@ if strcmp(name(end-2:end),'ptu')
                         
             if ~head.TNTisBiDirectional
                 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);   
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);   
                 while (num>0)
                     
                     cnt = cnt + num;
@@ -283,7 +285,7 @@ if strcmp(name(end-2:end),'ptu')
                         cn_ind = 0;
                     end
                     
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                     
                 end
                          
@@ -295,7 +297,7 @@ if strcmp(name(end-2:end),'ptu')
                     [BidirectShift, head] = PTU_getBidirectShift(name);
                 end
                 
-                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+                [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 %                 Framechange = [];
                 while (num>0)
                     
@@ -441,7 +443,7 @@ if strcmp(name(end-2:end),'ptu')
                         im_col = cast([],'like',im_col);
                         cn_ind = 0;
                     end
-                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [photons cnt+1], head.length, head.TTResultFormat_TTTRRecType);
+                    [tmpy, tmptcspc, tmpchan, tmpmarkers, num, loc] = PTU_Read(name, [cnt+1 photons], head);
                 end
             end
             
