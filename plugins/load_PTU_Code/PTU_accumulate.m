@@ -355,8 +355,8 @@ while cframe<=lastframe_binned
 
         %apply ISM reassigment vektor
         %take care of pixel size difference
-        im_col  = im_col + shift_x./(head.TNTpixelSize/shiftVector.svPixelSize);
-        im_line = im_line + shift_y./(head.TNTpixelSize/shiftVector.svPixelSize);
+        im_col  = double(im_col) + shift_x./(head.TNTpixelSize/shiftVector.svPixelSize);
+        im_line = double(im_line) + shift_y./(head.TNTpixelSize/shiftVector.svPixelSize);
         
         clear shift_y shift_x;
     end
