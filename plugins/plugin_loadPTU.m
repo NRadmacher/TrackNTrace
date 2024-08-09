@@ -136,10 +136,17 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
             movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
             pluginOptions.uniqChan = head.TNTuniqChan; 
             if pluginOptions.fourierReweighting
-                PSF = calib.psf;
+                eps = 0.14;
+                if calib.pixSize == head.TNTpixelSize
+                    PSF = calib.psf;
+                else
+                    %calculate psf for current pixel size
+                    PSF = calib.PSFfunc(calib.NA,calib.fd,calib.lamex,...
+                        head.TNTpixelSize,calib.over);
+                end
                 fprintf('Fourier reweighting ... ');
                 parfor i = 1:size(movie,3)
-                    movie(:,:,i) = ISM_frw(movie(:,:,i), PSF);
+                    movie(:,:,i) = ISM_frw(movie(:,:,i), PSF, eps);
                 end
                 fprintf('Done!\n');
             end
