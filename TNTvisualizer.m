@@ -1334,7 +1334,7 @@ end
 
     % Switch flim and intensity display mode
     function flimCallback(~, ~)
-        isTimerOn = strcmp(get(h_all.timer, 'Running'), 'on');
+        isTimerOn = isfield(h_all,'timer') && strcmp(get(h_all.timer, 'Running'), 'on');
         if isTimerOn
             stop(h_all.timer);
         end
@@ -1379,7 +1379,7 @@ end
     end
 
     function setColormap(~, ~)
-        isTimerOn = strcmp(get(h_all.timer, 'Running'), 'on');
+        isTimerOn = isfield(h_all,'timer') && strcmp(get(h_all.timer, 'Running'), 'on');
         if isTimerOn
             stop(h_all.timer);
         end
@@ -1450,7 +1450,7 @@ end
 
     % Update the movie FPS
     function fpsCallback(~, ~)
-        isTimerOn = strcmp(get(h_all.timer, 'Running'), 'on');
+        isTimerOn = isfield(h_all,'timer') && strcmp(get(h_all.timer, 'Running'), 'on');
         if isTimerOn
             stop(h_all.timer);
         end
