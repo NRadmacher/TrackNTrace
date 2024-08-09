@@ -62,8 +62,8 @@ plugin.add_param('ISM',...
     'Applies ISM shift vectors to photon positions. If no calibrationFile is selected Fourier Reweighting is turned off');
 plugin.add_param('fastLT',...
     'list',...
-    {'Std','Mean','Median'},...
-    'Chose how the fast lifetime is calculated.');
+    {'Std','Mean','Median','None','ChanRatio'},...
+    'Chose how the fast lifetime is calculated. For ChanRatio, the relative intensity of the first channel is calculated.');
 plugin.add_param('cacheMovie',...
     'int',...
     {0,0,10},...
@@ -81,7 +81,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         if nargin<4 || isempty(frame_binning)
             frame_binning = 1;
         end
-        if nargin<5 || isempty(fastLT) 
+        if nargin<5 || isempty(fastLT) || contains(pluginOptions.fastLT,'none','IgnoreCase',true)
             fastLT = false;
         end
         if nargin<6
@@ -130,6 +130,18 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                     [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@mean}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
                 case 'Median'
                     [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@median}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
+                case 'ChanRatio'
+                    % create channelmap. We don't know yet how many
+                    % channels are present. Assuming at most 64.
+                    channelmap = [1;2*ones(63,1)];
+                    [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
+                    tau = movie(:,:,1,:); % tau is here the relative intensity in the first channel
+                    movie = sum(movie,3); % The PTU channels are summed for now. In future this could be an option.
+                    ind = tau>0;
+                    tau(ind) = tau(ind)./movie(ind);
+                    if head.TNTnChan>size(channelmap,1)
+                        fprintf('Channel with number > 64 are ignored.');
+                    end
                 otherwise
                     error('Unknown fastLT parameter');
             end
@@ -214,7 +226,8 @@ function argout = getCache(filename_movie, varargin)
         for icache = 1:ncache
             argin =  mf.argin(icache,1);
             argin = argin{1};
-            if ~varargin{3}
+            fastLT = varargin{3};
+            if ~fastLT
                 % Extra FLIM data does not interfere
                 varargin{5} = argin{6};
                 varargin{3} = argin{4};
@@ -224,6 +237,10 @@ function argout = getCache(filename_movie, varargin)
                 argout = mf.argout(icache,1);
                 argout = argout{1};
                 mf.time_read(icache,1) = now; % Update last read timestamp
+                % Drop FLIM data if present and not requested
+                if ~fastLT && numel(argout{1})>1
+                    argout{1} = argout{1}(1);
+                end
                 break;
             end
         end
