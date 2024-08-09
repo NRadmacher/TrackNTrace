@@ -66,7 +66,7 @@ plugin.add_param('fastLT',...
     'Chose how the fast lifetime is calculated. For ChanRatio, the relative intensity of the first channel is calculated.');
 plugin.add_param('cacheMovie',...
     'int',...
-    {0,0,10},...
+    {2,0,10},...
     'Number of generated movie versions to save temporary. 0 disables cache. Oldest will be replaced if necessary.');
 
 end
@@ -105,11 +105,15 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
             else %confocal
                 shiftVector = [];   
             end
-
+        end
+        if pluginOptions.fourierReweighting
+            PSF = calib.psf;
+        else
+            PSF = [];
         end
 
         % Check cache
-        movieArgs = {filename_movie, frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector};
+        movieArgs = {filename_movie, frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF};
         outArgs = getCache(movieArgs{:});
         if ~isempty(outArgs)
             [movie,metadata] = outArgs{1:2};
@@ -148,7 +152,6 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
             movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
             pluginOptions.uniqChan = head.TNTuniqChan; 
             if pluginOptions.fourierReweighting
-                PSF = calib.psf;
                 fprintf('Fourier reweighting ... ');
                 parfor i = 1:size(movie,3)
                     movie(:,:,i) = ISM_frw(movie(:,:,i), PSF);
@@ -211,7 +214,7 @@ function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons)
 end
 
 function argout = getCache(filename_movie, varargin)
-    % varargin = {frame_range, frame_binning,fastLT,timegate,fastLTmethod}
+    % varargin = {frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF}
     argout = {};
     try
         mf = openCache(filename_movie,false);
@@ -251,7 +254,7 @@ function argout = getCache(filename_movie, varargin)
 end
 
 function setCache(argout,maxcache, filename_movie, varargin)
-% varargin = {frame_range, frame_binning,fastLT,timegate,fastLTmethod};
+% varargin = {frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF}
     if maxcache == 0
         openCache(filename_movie,false,true);       
         return
