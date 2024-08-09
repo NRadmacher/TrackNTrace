@@ -192,7 +192,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
 %     profile viewer
 end
 
-function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons)
+function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons,pluginOptions)
     if endsWith(inputfile,'.mat')
         mfile = inputfile;
     else
@@ -200,7 +200,7 @@ function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons)
     end
     
     if ~exist(mfile,'file')
-        PTU_index(inputfile,[],shiftVector);
+        PTU_index(inputfile, pluginOptions.alignBidirectional);
         if ~exist(mfile,'file') % incase PTU_index fails
             error('Could not find PTU index file.');
         end
