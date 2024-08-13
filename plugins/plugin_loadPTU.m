@@ -108,8 +108,10 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         end
         if pluginOptions.fourierReweighting
             PSF = calib.psf;
+            eps = 0.09;
         else
             PSF = [];
+            eps = [];
         end
 
         % Check cache
@@ -155,7 +157,6 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         
         movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
         if pluginOptions.fourierReweighting
-            eps = 0.09;
             if calib.pixSize ~= head.TNTpixelSize
                 %calculate psf for current pixel size
                 PSF = calib.PSFfunc(calib.NA,calib.fd,calib.lamex,...
@@ -182,6 +183,8 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                 'tau_unit','ns',...
                 'bidirectional',logical(head.ImgHdr_BiDirect),...
                 'ISM', ~isempty(pluginOptions.calibrationFile),...
+                'FRW', pluginOptions.fourierReweighting,...
+                'epsilon', eps,...
                 'head',head...
                 );
             if isfield(head,'ImgHdr_FrameFrequency')
