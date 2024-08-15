@@ -205,7 +205,9 @@ function [head] = PTU_Read_Head(name)
                         %skipped
                         else
                             head.TNTnChan       = ind(end);
-                            head.TNTchanMap     = ones(head.TNTnChan,1);
+                            %FIX if imputrates in incompleat error when
+                            %calling PTU-accumulate without channelmap
+                            head.TNTchanMap     = ones( head.(numberOfChFields{i}),1);
                         end
                     else %if all Imputrates are 0. Currently fix for luminosa data
                         [~,~,ic] = unique(head.HWInpChan_TrgLevel);

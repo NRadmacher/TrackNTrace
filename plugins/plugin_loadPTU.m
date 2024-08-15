@@ -108,8 +108,10 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         end
         if pluginOptions.fourierReweighting
             PSF = calib.psf;
+            eps = 0.09;
         else
             PSF = [];
+            eps = [];
         end
 
         % Check cache
@@ -122,7 +124,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
 
         if ~logical(fastLT)
             [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
-            movie = {sum(permute(movie,[1 2 4 3]),4)}; % The PTU channels are summed for now. In future this could be an option.
+            tau = [];
         else
             if ~isfield(pluginOptions,'fastLT')||isempty(pluginOptions.fastLT)
                 pluginOptions.fastLT = 'Std';
@@ -149,19 +151,30 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                 otherwise
                     error('Unknown fastLT parameter');
             end
-            movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
             pluginOptions.uniqChan = head.TNTuniqChan; 
-            if pluginOptions.fourierReweighting
-                fprintf('Fourier reweighting ... ');
-                parfor i = 1:size(movie,3)
-                    movie(:,:,i) = ISM_frw(movie(:,:,i), PSF);
-                end
-                fprintf('Done!\n');
-            end
-
             tau = mean(permute(tau,[1 2 4 3]),4,"omitnan");
-            movie = {movie,tau};
         end
+        
+        movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
+        if pluginOptions.fourierReweighting
+            if calib.pixSize ~= head.TNTpixelSize
+                %calculate psf for current pixel size
+                PSF = calib.PSFfunc(calib.NA,calib.fd,calib.lamex,...
+                    head.TNTpixelSize,calib.over);
+            end
+            fprintf('Fourier reweighting ... ');
+            parfor i = 1:size(movie,3)
+                movie(:,:,i) = ISM_frw(movie(:,:,i), PSF, eps);
+            end
+            fprintf('Done!\n');
+        end
+
+        if ~isempty(tau)
+            movie = {movie,tau};
+        else
+            movie = {movie};
+        end
+
         if nargout>1 || (isfield(pluginOptions,'cacheMovie') && pluginOptions.cacheMovie>0)
             metadata = struct(...
                 'filename',filename_movie,...
@@ -170,6 +183,8 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                 'tau_unit','ns',...
                 'bidirectional',logical(head.ImgHdr_BiDirect),...
                 'ISM', ~isempty(pluginOptions.calibrationFile),...
+                'FRW', pluginOptions.fourierReweighting,...
+                'epsilon', eps,...
                 'head',head...
                 );
             if isfield(head,'ImgHdr_FrameFrequency')

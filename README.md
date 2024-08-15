@@ -41,7 +41,7 @@ If you use the new FLIM capabilities please also cite:
 JC Thiele, DA Helmerich, N Oleksiievets, R Tsukanov, E Butkevich, M Sauer, O Nevskyi, and J Enderlein, *ACS Nano*, 14, 10, 14190–14200; doi: [10.1021/acsnano.0c07322](https://pubs.acs.org/doi/10.1021/acsnano.0c07322) (2020).
 
 If you use the new ISM version please also cite:
-N Radmacher, O Nevskyi, JI Gallea, JC Thiele, I Gregor, SO Rizzoli and J Enderlein, *bioRxiv*, doi: [10.1101/2023.08.23.554438](https://doi.org/10.1101/2023.08.23.554438) (2024).
+N Radmacher, O Nevskyi, JI Gallea, JC Thiele, I Gregor, SO Rizzoli and J Enderlein, *Nat. Photon.*, doi: [10.1038/s41566-024-01481-4](https://doi.org/10.1038/s41566-024-01481-4) (2024).
 
 ## Licensing
 

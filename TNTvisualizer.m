@@ -204,8 +204,8 @@ allFramesCandidateData = []; % Computed on demand for histogram plots
 allFramesRefinementData = []; % Computed on demand for histogram plots
 
 use_flim = false;                                                   % Plot FLIM image
-cm_maps = {@cmap_heat,'hot','gray','jet','hsv',@cmap_isoluminant65,@cmap_isoluminant75,@cmap_isoluminant70r,@cmap_rainbow_bgyrm};% List of available colormaps
-cm_names = {'heat','hot','B/W','jet','hsv','iso65','iso75','iso70r','Rainbow'};
+cm_maps = {@cmap_heat,'hot','gray','jet','hsv',@cmap_isoluminant65,@cmap_isoluminant75,@cmap_isoluminant70r,@cmap_rainbow_bgyrm,@cmap_greenFireBlue,@cmap_mlp_inferno};% List of available colormaps
+cm_names = {'heat','hot','B/W','jet','hsv','iso65','iso75','iso70r','Rainbow','Green Fire Blue','mlp-inferno'};
 cm_ind = 1;                                                         % Default colormap
 cm_ind_inactive = 7;                                                % Default colormap for FLIM
 cm_invert = false;                                                  % invert colormap

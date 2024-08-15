@@ -11,7 +11,7 @@ function [head, im_sync, im_tcspc, im_chan, im_line, im_col, im_frame] = PTU_ind
 %
 % Copyright (C) 2020, Jan Christoph Thiele, christoph.thiele@phys.uni-goettingen.de
 
-photons = 1e7;
+photons = 5e6;
 if strcmp(name(end-2:end),'ptu')
     
     head = PTU_Read_Head(name);
@@ -104,8 +104,8 @@ if strcmp(name(end-2:end),'ptu')
                 tot_time = head.TTResult_StopAfter*1e-3;
                 nz = ceil(tot_time/tim_p_frame);
             end
-            class_x = 'double';  % class for the x position
-            class_y = 'double';  % class for the y position
+            class_x = intminclass(nx);  % class for the x position
+            class_y = intminclass(ny);  % class for the y position
             class_f = intminclass(nz);  % class for the frame number
             
             LineStart = 4;
