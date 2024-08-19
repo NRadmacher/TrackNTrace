@@ -108,7 +108,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         end
         if pluginOptions.fourierReweighting
             PSF = calib.psf;
-            eps = 0.09;
+            eps = 0.45;
         else
             PSF = [];
             eps = [];
