@@ -210,8 +210,12 @@ function [head] = PTU_Read_Head(name)
                             head.TNTchanMap     = ones( head.(numberOfChFields{i}),1);
                         end
                     else %if all Imputrates are 0. Currently fix for luminosa data
-                        [~,~,ic] = unique(head.HWInpChan_TrgLevel);
-                        ind = (ic.' == 1)&(head.HWInpChan_Offset ~= 0);
+                        if isfield(head,'HWInpChan_TrgLevel')
+                            [~,~,ic] = unique(head.HWInpChan_TrgLevel);
+                            ind = (ic.' == 1)&(head.HWInpChan_Offset ~= 0);
+                        elseif isfield(head,'HWInpChan_CFDLevel')
+                            [~,~,ind] = unique(head.HWInpChan_CFDLevel);
+                        end
                         head.TNTnChan       = sum(ind);
                         head.TNTchanMap     = ones(head.TNTnChan,1);
                     end
