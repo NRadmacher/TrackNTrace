@@ -2710,7 +2710,7 @@ end
                     movieLT = [];
                 end
                 movie = movie{1};
-                if isempty(movie)
+                if isempty(movie) % but why see line 2705
                     set(findall(h_all.panel_player,'Enable','on','Type','UIControl','-not','Style','text'),'Enable','off');
                 else
                     set(findall(h_all.panel_player,'Enable','off','Type','UIControl','-not','Style','text'),'Enable','on');
@@ -2720,16 +2720,15 @@ end
                         set(h_all.cb_flim, 'Value', false);
                         flimCallback([],[]);
                     end
-                    
-                    if(size(movie,3)>1)
-                        set(h_all.slider,'Value',1, 'Min',1,'Max',size(movie,3),'SliderStep',[1/size(movie,3) 1/size(movie,3)],'Callback', @sliderCallback);
-                        set(h_all.slider,'Enable','on');
-                        set(h_all.but_play,'Enable','on');
-                    else % For single images we disable slider and play button
-                        set(h_all.slider,'Enable','off');
-                        set(h_all.but_play,'Enable','off');
-                    end
                 end
+            end
+            if(size(movie,3)>1)
+                set(h_all.slider,'Value',1, 'Min',1,'Max',size(movie,3),'SliderStep',[1/size(movie,3) 1/size(movie,3)],'Callback', @sliderCallback);
+                set(h_all.slider,'Enable','on');
+                set(h_all.but_play,'Enable','on');
+            else % For single images we disable slider and play button
+                set(h_all.slider,'Enable','off');
+                set(h_all.but_play,'Enable','off');
             end
         end
     end
