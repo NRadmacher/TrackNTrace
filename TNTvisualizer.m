@@ -2710,7 +2710,7 @@ end
                     movieLT = [];
                 end
                 movie = movie{1};
-                if isempty(movie) % but why see line 2705
+                if isempty(movie)
                     set(findall(h_all.panel_player,'Enable','on','Type','UIControl','-not','Style','text'),'Enable','off');
                 else
                     set(findall(h_all.panel_player,'Enable','off','Type','UIControl','-not','Style','text'),'Enable','on');
