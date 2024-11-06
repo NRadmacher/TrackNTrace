@@ -12,12 +12,8 @@ function [fighdl] = showTimegate(inputfile,importOptions,timegate,nsFlag)
         nsFlag = false;
     end
     
-    if nargin(importOptions.info.getTCSPC) == 3
-        [tcspcdata,Resolution] = importOptions.info.getTCSPC(inputfile,maxPhotons,importOptions); % Resolution in s
-    else
-        [tcspcdata,Resolution] = importOptions.info.getTCSPC(inputfile,maxPhotons); % Resolution in s
-    end
-        
+    [tcspcdata,Resolution] = importOptions.info.getTCSPC(inputfile,maxPhotons); % Resolution in s
+    
     if nsFlag
         timegate = timegate./(Resolution*1e9);
     end
@@ -30,8 +26,7 @@ function [fighdl] = showTimegate(inputfile,importOptions,timegate,nsFlag)
     
     xlabel('Time bin');
     ylabel('Counts');
-    if ~isempty(tcspc)
-        legend({'TCSPC',sprintf('Within the timegate: %.1f%%',100*sum(tcspc_tg)/sum(tcspc))});
-    end
+    legend({'TCSPC',sprintf('Within the timegate: %.1f%%',100*sum(tcspc_tg)/sum(tcspc))});
+    
 end
 
