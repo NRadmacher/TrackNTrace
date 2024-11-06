@@ -40,11 +40,11 @@ if ~isempty(head)
     
     if (nargin<2)||isempty(cnts)
         cnts = [0 0];
-    end;
+    end
     
     if numel(cnts)<2
         cnts = [0 cnts];
-    end;
+    end
 
     
     if cnts(2)>0
@@ -76,9 +76,9 @@ if ~isempty(head)
                 end                
             end
                                     
-            [T3Record num] = fread(fid, cnts(2), 'ubit32'); % all 32 bits:
+            [T3Record, num] = fread(fid, cnts(2), 'ubit32'); % all 32 bits:
                         
-            switch head.TTResultFormat_TTTRRecType;
+            switch head.TTResultFormat_TTTRRecType
                 case rtPicoHarpT3
                     
                     WRAPAROUND=65536;
@@ -143,7 +143,7 @@ if ~isempty(head)
                     
                 otherwise
                     error('Illegal RecordType!');
-            end;
+            end
 
             tmp  = sync(ind==1);
             tmp(tmp==0) = 1;
@@ -165,6 +165,6 @@ if ~isempty(head)
             fprintf(1,'\n\n      You have to specify a valid file-name. Aborted.\n');
         else
             fprintf(1,'\n\n      Could not open <%s>. Aborted.\n', name);
-        end;
+        end
     end
 end

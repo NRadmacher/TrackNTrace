@@ -42,12 +42,28 @@ plugin.info = struct(...
 % The syntax has to be:
 % PTU_accumulate(inputfile, outputs, framebinning, pixelbinning, timegate)
 plugin.initFunc = @(opt)@PTU_accumulate;
-plugin.postFunc = @(opt)@PTU_accumulate;
+plugin.postFunc = @accumulate_select;
 
 plugin.add_param('alignBidirectional',...
     'bool',...
-    true,...
+    false,...
     'Automatically determines and corrects the shift between lines for bidirectional scans.');
+plugin.add_param('calibrationFile',...
+    'filechooser',...
+    {'','mat'},...
+    'Select a file with ISM calibration data.');
+plugin.add_param('ISM',...
+    'bool',...
+    true,...
+    'Applies ISM shift vectors to photon positions. If no calibrationFile is selected Fourier Reweighting is turned off');
+plugin.add_param('fourierReweighting',...
+    'bool',...
+    false,...
+    'Applies Fourier Reweighting to ISM shifted images to achieve resolution doubeling. If no calibrationFile is selected Fourier Reweighting is turned off');
+plugin.add_param('eps',...
+    'float',...
+    {0.1, 0, 1},...
+    'Regularization parameter epsilon to prevent noise over amplification during Fourier Reweighting');
 plugin.add_param('fastLT',...
     'list',...
     {'Std','Mean','Median','None','ChanRatio'},...
@@ -57,15 +73,6 @@ plugin.add_param('cacheMovie',...
     {2,0,10},...
     'Number of generated movie versions to save temporary. 0 disables cache. Oldest will be replaced if necessary.');
 
-plugin.newRow();
-NChanMax = 4;
-for cidx = 1:NChanMax
-    plugin.add_param(sprintf('chan%i',cidx),...
-        'bool',...
-        true,...
-        sprintf('Include photons in channel %i.',cidx));
-end
-
 end
 
 
@@ -73,6 +80,7 @@ end
 
 
 function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, frame_binning,fastLT,timegate)
+%     profile on
     if endsWith(filename_movie,'ptu')
         if nargin<4 || isempty(frame_binning)
             frame_binning = 1;
@@ -83,11 +91,35 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         if nargin<6
             timegate = [];
         end
-        
-        chan_selected = getSelectedChannels(pluginOptions);
-        channelmap = double(chan_selected);
+
+        if isempty(pluginOptions.calibrationFile)
+            % turn off fourierReweighting and ISM when no calibration file
+            % is selected
+            pluginOptions.fourierReweighting = false;
+            pluginOptions.ISM = false;
+            channelmap = [];
+            shiftVector = [];
+        else
+            calib = open(pluginOptions.calibrationFile);
+            n_pix = size(calib.shiftVector,2);
+            channelmap = ones(n_pix,1);
+            if pluginOptions.ISM
+                shiftVector.sv          = calib.shiftVector;
+                shiftVector.svPixelSize = calib.pixSize;
+            else %confocal
+                shiftVector = [];   
+            end
+        end
+        if pluginOptions.fourierReweighting
+            PSF = calib.psf;
+            eps = pluginOptions.eps;
+        else
+            PSF = [];
+            eps = [];
+        end
+
         % Check cache
-        movieArgs = {filename_movie, frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT,chan_selected};
+        movieArgs = {filename_movie, frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF, eps};
         outArgs = getCache(movieArgs{:});
         if ~isempty(outArgs)
             [movie,metadata] = outArgs{1:2};
@@ -95,32 +127,58 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
         end
 
         if ~logical(fastLT)
-            [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap);
-            movie = {double(permute(movie,[1 2 4 3]))}; % The PTU channels are summed by PTU_accumulate with the channelmap argument.
+            [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
+            tau = [];
         else
             if ~isfield(pluginOptions,'fastLT')||isempty(pluginOptions.fastLT)
                 pluginOptions.fastLT = 'Std';
             end
             switch pluginOptions.fastLT
                 case 'Std'
-                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag','tau'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap);
+                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag','tau'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
                 case 'Mean'
-                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@mean}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap);
+                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@mean}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
                 case 'Median'
-                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@median}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap);
+                    [head,movie,tau] = PTU_accumulate(filename_movie,{'head','tag',{'tau',@median}},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
                 case 'ChanRatio'
-                    [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,chan_selected);
+                    % create channelmap. We don't know yet how many
+                    % channels are present. Assuming at most 64.
+                    channelmap = [1;2*ones(63,1)];
+                    [head,movie] = PTU_accumulate(filename_movie,{'head','tag'},[frame_binning, frame_range],[],timegate,pluginOptions.alignBidirectional,channelmap,shiftVector);
                     tau = movie(:,:,1,:); % tau is here the relative intensity in the first channel
                     movie = sum(movie,3); % The PTU channels are summed for now. In future this could be an option.
                     ind = tau>0;
                     tau(ind) = tau(ind)./movie(ind);
+                    if head.TNTnChan>size(channelmap,1)
+                        fprintf('Channel with number > 64 are ignored.');
+                    end
                 otherwise
                     error('Unknown fastLT parameter');
             end
-            movie = double(permute(movie,[1 2 4 3])); % The PTU channels are summed by PTU_accumulate with the channelmap argument.
-            tau = permute(tau,[1 2 4 3]);
-            movie = {movie,tau};
+            pluginOptions.uniqChan = head.TNTuniqChan; 
+            tau = mean(permute(tau,[1 2 4 3]),4,"omitnan");
         end
+        
+        movie = sum(permute(movie,[1 2 4 3]),4); % The PTU channels are summed for now. In future this could be an option.
+        if pluginOptions.fourierReweighting
+            if calib.pixSize ~= head.TNTpixelSize
+                %calculate psf for current pixel size
+                PSF = calib.PSFfunc(calib.NA,calib.fd,calib.lamex,...
+                    head.TNTpixelSize,calib.over);
+            end
+            fprintf('Fourier reweighting ... ');
+            parfor i = 1:size(movie,3)
+                movie(:,:,i) = ISM_frw(movie(:,:,i), PSF, eps);
+            end
+            fprintf('Done!\n');
+        end
+
+        if ~isempty(tau)
+            movie = {movie,tau};
+        else
+            movie = {movie};
+        end
+
         if nargout>1 || (isfield(pluginOptions,'cacheMovie') && pluginOptions.cacheMovie>0)
             metadata = struct(...
                 'filename',filename_movie,...
@@ -128,6 +186,9 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
                 'pixelsize_unit',[char(181) 'm'],...% um
                 'tau_unit','ns',...
                 'bidirectional',logical(head.ImgHdr_BiDirect),...
+                'ISM', ~isempty(pluginOptions.calibrationFile),...
+                'FRW', pluginOptions.fourierReweighting,...
+                'epsilon', eps,...
                 'head',head...
                 );
             if isfield(head,'ImgHdr_FrameFrequency')
@@ -147,6 +208,7 @@ function [movie,metadata] = read_PTU(pluginOptions,filename_movie, frame_range, 
     else
         error('No PTU file.');
     end
+%     profile viewer
 end
 
 function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons,pluginOptions)
@@ -157,7 +219,7 @@ function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons,pluginOptions)
     end
     
     if ~exist(mfile,'file')
-        PTU_index(inputfile);
+        PTU_index(inputfile, pluginOptions.alignBidirectional);
         if ~exist(mfile,'file') % incase PTU_index fails
             error('Could not find PTU index file.');
         end
@@ -168,26 +230,10 @@ function [tcspcdata,resolution] = getTCSPC(inputfile,maxPhotons,pluginOptions)
     resolution = head.MeasDesc_Resolution; % in s
     
     tcspcdata = mf.im_tcspc(1:min(maxPhotons,size(mf,'im_tcspc',1)),1);
-    chan_selected = getSelectedChannels(pluginOptions);
-    if ~all(chan_selected)
-        % all photons in a selected channel
-        ind = chan_selected(mf.im_chan(1:size(tcspcdata,1),1)); 
-        tcspcdata = tcspcdata(ind);
-    end
 end
-
-function chan_selected = getSelectedChannels(pluginOptions)
-    % Build channel selection vector
-    NChanMax = sum(~cellfun(@isempty,regexpi(fieldnames(pluginOptions),'^chan\d+$','start')));
-    chan_selected = false(NChanMax,1);
-    for cidx = 1:NChanMax
-        chan_selected(cidx) = pluginOptions.(sprintf('chan%i',cidx));
-    end
-end
-
 
 function argout = getCache(filename_movie, varargin)
-    % varargin = {frame_range, frame_binning,fastLT,timegate,fastLTmethod,chan_selected}
+    % varargin = {frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF}
     argout = {};
     try
         mf = openCache(filename_movie,false);
@@ -225,8 +271,9 @@ function argout = getCache(filename_movie, varargin)
         openCache(filename_movie,false,true);  
     end
 end
+
 function setCache(argout,maxcache, filename_movie, varargin)
-% varargin = {frame_range, frame_binning,fastLT,timegate,fastLTmethod};
+% varargin = {frame_range, frame_binning,fastLT,timegate,pluginOptions.fastLT, shiftVector, PSF}
     if maxcache == 0
         openCache(filename_movie,false,true);       
         return
@@ -250,6 +297,7 @@ function setCache(argout,maxcache, filename_movie, varargin)
     mf.time_read(icache,1) = now;
     mf.time_created(icache,1) = now;
 end
+
 function mf = openCache(filename_movie,createFlag,clearFlag)
     cacheSuffix = '_FLIM.cache';
     [fpath,fname] = fileparts(filename_movie);
@@ -265,6 +313,26 @@ function mf = openCache(filename_movie,createFlag,clearFlag)
         mf.filename_movie = filename_movie;
     else
         mf = [];
+    end
+end
+
+function accumFun = accumulate_select(opt)
+    % opt importOptions
+    if ~isempty(opt.calibrationFile)
+        calib = open(opt.calibrationFile);
+        shiftVector.sv          = calib.shiftVector;
+        shiftVector.svPixelSize = calib.pixSize;
+        n_pix = size(calib.shiftVector,2);
+        channelmap = ones(n_pix,1);
+        accumFun = @accumulate_shifted;
+    else
+        accumFun = @PTU_accumulate;
+    end
+    
+    function varargout = accumulate_shifted(varargin)
+        varargin{7} = channelmap;
+        varargin{8} = shiftVector;
+        [varargout{1:nargout}] = PTU_accumulate(varargin{:});
     end
 end
 

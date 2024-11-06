@@ -25,6 +25,13 @@ This is an extended version of TrackNTrace for the processing of FLIM (fluoresce
 This version is suitable for lifetime-resolved single molecule localisation microscopy with either a CLSM (eg. Microtime 200 with FLIMbee scanner, Picoquant) or a TCSPC camera (LinCAM, Photonscore).
 It is maintained by Jan Christoph Thiele from the University of Goettingen. Its first release can be found [here](../../releases/tag/v2.0).
 
+## TrackNTrace *ISM Edition*
+This extends the *Lifetime Edition* of TrackNTrace to analyze data recorded with an Array-Detector introducing the following features:
+* switching between different ISM data analysis modes
+	* *summing* up all photons from all pixels, equivalent to a CLSM with opened pinhole
+	* *pixel reassignment* to adjust the position of each detected photon, increasing the lateral resolution by a factor of 1.41 
+	* *fourier-reweighting* to readjust Fourier-frequency distribution after pixel reassignment, increasing the lateral resolution by an additional factor of 1.41
+* consistent naming convention for PTU imports
 
 ## Citation
 If you use TrackNTrace please consider citing: 
@@ -32,6 +39,9 @@ SC Stein, and J Thiart, *Sci. Rep.* **6**, 37947; doi: [10.1038/srep37947](https
 
 If you use the new FLIM capabilities please also cite:
 JC Thiele, DA Helmerich, N Oleksiievets, R Tsukanov, E Butkevich, M Sauer, O Nevskyi, and J Enderlein, *ACS Nano*, 14, 10, 14190–14200; doi: [10.1021/acsnano.0c07322](https://pubs.acs.org/doi/10.1021/acsnano.0c07322) (2020).
+
+If you use the new ISM version please also cite:
+N Radmacher, O Nevskyi, JI Gallea, JC Thiele, I Gregor, SO Rizzoli and J Enderlein, *Nat. Photon.*, 18, 1059–1066 doi: [10.1038/s41566-024-01481-4](https://doi.org/10.1038/s41566-024-01481-4) (2024).
 
 ## Licensing
 

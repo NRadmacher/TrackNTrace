@@ -104,13 +104,16 @@ function options = init_fitLT(options,globalOptions,importOptions)
             options.cacheFunc = [];
         end
         options.accumFunc = importOptions.postFunc(importOptions);
-        if globalOptions.useTimegate
-            options.timegate = [globalOptions.tgStart globalOptions.tgEnd];
-        else
-            options.timegate = [];
-        end
+    end
+    if globalOptions.useTimegate
+        options.timegate = [globalOptions.tgStart globalOptions.tgEnd];
+    else
+        options.timegate = [];
     end
     
+    movieArgs = {filename_movie, options.framebinning(2:3), globalOptions.binFrame,false,options.timegate};
+    options.movieFunc = @()importOptions.mainFunc(importOptions,movieArgs{:});
+
     % Set name of output variables
     global trackingOptions % Needed as we drag along names specified here
     options.outParamDescription = [trackingOptions.outParamDescription(:);'tau-fast';'nphoton'];
@@ -144,16 +147,22 @@ function [postprocData,options] = fitLT(trackingData,options)
         if ~issorted(trackingData(:,1)) %Tracking data has to be sorted by id (TNTnearestNeighbor does this by default).
             trackingData = sortrows(trackingData,1);
         end
+        
+        %take number of unique channesl as numner of channels
+        Nchan = head.TNTuniqChan;
+        
         if options.sumTCSPC
-            tcspc_mol = zeros(1,trackingData(end,1),head.MeasDesc_Ngate,head.MeasDesc_Nchan);
+            tcspc_mol = zeros(1,trackingData(end,1),head.MeasDesc_Ngate,Nchan);
         else
-            tcspc_mol = zeros(1,size(trackingData,1),head.MeasDesc_Ngate,head.MeasDesc_Nchan);            
+            tcspc_mol = zeros(1,size(trackingData,1),head.MeasDesc_Ngate,Nchan);            
         end
         switch options.position
             case 'Refit'
                 rewPrintf('TNT: Refitting positions of tracks: constructing image\n');
-                img = options.accumFunc(cacheORfile,{'tag'},options.framebinning,[],options.timegate); %TODO use cache if exists
-                img = sum(img,3); % sum all channels
+%                 img = options.accumFunc(cacheORfile,{'tag'},options.framebinning,[],options.timegate); %TODO use cache if exists
+%                 img = sum(img,3); % sum all channels
+                [img,~] = options.movieFunc();
+                img = img{1};
                 halfw = max(round(3*quantile(trackingData(:,8),0.99)),4); % for dense data this window might be too large
                 imgLoc = zeros(2*halfw+1,2*halfw+1,trackingData(end,1));
                 imgInd = 0:2*halfw; % due to padding the coordinates are shifted by halfw
@@ -180,7 +189,7 @@ function [postprocData,options] = fitLT(trackingData,options)
                     end
                     offLoc(ctrack,:) = round(tempLoc(1:2));
                     % crop fit window
-                    imgLoc(:,:,ctrack) = sum(img(imgInd+offLoc(ctrack,2),imgInd+offLoc(ctrack,1),:,trackingData(c_ind,2)),4); % sum all frames. Gaps in the track are not filled.
+                    imgLoc(:,:,ctrack) = sum(img(imgInd+offLoc(ctrack,2),imgInd+offLoc(ctrack,1),trackingData(c_ind,2)),3); % sum all frames. Gaps in the track are not filled.
                     % shift position to fit window
                     oldLoc(ctrack,:) = [(tempLoc(1:2) +1 -offLoc(ctrack,:) +halfw), tempLoc(3:end)];
                 end
@@ -396,7 +405,7 @@ function [postprocData,options] = fitLT(trackingData,options)
                     attmpt_p = nan(3,attmpt);
                     attmpt_mle = nan(1,attmpt);
                     
-                    PM_tau(isnan(PM_tau)) = nanmean(PM_tau); % Replace nans
+                    PM_tau(isnan(PM_tau)) = mean(PM_tau,'omitnan'); % Replace nans
                     amp_init = (1-PM_bg).*PM_np ./ exp(-options.cutoff./PM_tau);
                     bg_init = max(PM_bg.*PM_np,1);
                     for idx = 1:size(tcspc_cut,1)
