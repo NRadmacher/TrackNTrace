@@ -84,5 +84,3 @@ TrackNTrace uses variety of external programs / modules:
 	URL: https://www.photonscore.de/
 	
 See the "License.txt" file for more information.
-
-Small insignificant change.
