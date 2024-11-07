@@ -342,6 +342,7 @@ set(h_all.but_showList, 'Callback', @showList);
 set(h_all.but_exportList, 'Callback', @exportList);
 set(h_all.but_exportWS, 'Callback', @exportWS);
 set(h_all.but_resetFilter, 'Callback', @resetFilter);
+set(h_all.but_exportThunderStorm, 'Callback', @exportThunderStorm);
 
 % Reconstruction panel
 set(h_all.but_reconstruct,'Callback',@callback_reconstruct);
@@ -1721,6 +1722,60 @@ end
         assignin('base','TNT_metaData',metadata);
             
     end
+
+    function exportThunderStorm(~,~)
+        if ~exist('TNT_locData','var')
+            TNT_metaData = evalin('base','TNT_metaData');
+        end
+
+        modifiers = get(h_main,'currentModifier');
+        ctrlIsPressed = ismember('control',modifiers);
+        showFiltered = ctrlIsPressed;        
+        [data,~,header] = generateList(mode,showFiltered);
+        data = array2table(data,'VariableNames',matlab.lang.makeValidName(header));
+
+        assignin('base','TNT_metaData',metadata);
+
+        if isempty(data)
+            fprintf('No localizations found to export.\n');
+            return
+        end
+        
+        if ~istable(data)
+            if isnumeric(data)
+                if nargin>1 && iscellstr(TNT_metaData) && numel(TNT_metaData)==size(data,2)
+                    varNames = TNT_metaData;
+                else
+                    varNames = arrayfun(@(n)sprintf('col%g',n),1:size(data,2),'UniformOutput',false);
+                end
+                data = array2table(data,'VariableNames',varNames);
+            else
+                warning('Unsupported data type: data needs to be a table or matrix.');        
+            end
+        end
+
+        TSpixSize = TNT_metaData.pixelsize * 1e3;
+        
+        if ismember('nphoton',data.Properties.VariableNames)
+            TStable = table(data.Frame, data.x*TSpixSize,...
+                data.y*TSpixSize,data.z,data.nphoton, ...
+                'VariableNames',{'frame';'x [nm]';'y [nm]';'z [nm]';'nphoton'});
+        else
+            TStable = table(data.Frame, data.x*TSpixSize,...
+                data.y*TSpixSize,data.z, ...
+                'VariableNames',{'frame';'x [nm]';'y [nm]';'z [nm]'});
+
+        end
+
+        TStableSort = sortrows(TStable);
+        %save thunderStrom file to location for raw data
+        tmpName = dir(TNT_metaData.filename);
+        fname = strsplit(tmpName.name,'.');
+        name = append(tmpName.folder,'\',fname{1},'_ThunderStorm', '.csv');
+        writetable(TStableSort,name);
+        
+        end
+
     function exportList(~,~)
         modifiers = get(h_main,'currentModifier');
         ctrlIsPressed = ismember('control',modifiers);
