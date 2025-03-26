@@ -1753,10 +1753,10 @@ end
                     data.y*TSpixSize,data.z, ...
                     'VariableNames',{'frame';'x [nm]';'y [nm]';'z [nm]'});
             end
+            % writetable is working but very slow and requires sanitisation
+            % of paramNames
+            writetable(TStable,exportFile,'Delimiter',',','FileType','text');
         end
-        % writetable is working but very slow and requires sanitisation
-        % of paramNames
-        writetable(TStable,exportFile,'Delimiter',',','FileType','text');
     end
 
     function exportList(~,~)
